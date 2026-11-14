@@ -1,0 +1,74 @@
+// Code your design here
+module up_down_counter(
+    input clk,
+    input rst,
+    input up_down,
+    output reg [3:0] count
+);
+
+    always @(posedge clk) begin
+        if (rst)
+            count <= 4'b0000;
+
+        else if (up_down)
+            count <= count + 1'b1;
+
+        else
+            count <= count - 1'b1;
+    end
+
+endmodule
+
+
+
+//test_bench
+
+  // Code your testbench here
+  // or browse Examples
+  module tb;
+
+      reg clk, rst, up_down;
+      wire [3:0] count;
+
+      up_down_counter DUT(
+          .clk(clk),
+          .rst(rst),
+          .up_down(up_down),
+          .count(count)
+      );
+
+      // Clock generation
+      always #5 clk = ~clk;
+
+      initial begin
+
+          $dumpfile("dump.vcd");
+          $dumpvars(0, tb);
+
+          clk = 0;
+          rst = 1;
+          up_down = 1;
+
+          // Reset
+          #10 rst = 0;
+
+          // Up counting
+          #60;
+
+          // Down counting
+          up_down = 0;
+          #60;
+
+          // Up counting again
+          up_down = 1;
+          #40;
+
+          $finish;
+      end
+
+      initial begin
+          $monitor("Time=%0t | Reset=%b | Direction=%b | Count=%d",
+                    $time, rst, up_down, count);
+      end
+
+  endmodule
