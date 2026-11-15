@@ -1,0 +1,31 @@
+`include "interface.sv"
+`include "test.sv"
+
+module top;
+  bit clk, rst;
+  always #5 clk = ~clk;
+
+  initial begin
+    rst = 1;
+    #5 rst = 0;
+  end
+
+  intf i_intf (clk, rst);
+  test t1 (i_intf);
+
+  full_adder dut (
+    .clk   (i_intf.clk),
+    .rst   (i_intf.rst),
+    .valid (i_intf.valid),
+    .a     (i_intf.a),
+    .b     (i_intf.b),
+    .cin   (i_intf.cin),
+    .sum   (i_intf.sum),
+    .cout  (i_intf.cout)
+  );
+
+  initial begin
+    $dumpfile("ex.vcd");
+    $dumpvars;
+  end
+endmodule

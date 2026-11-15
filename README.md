@@ -8,6 +8,18 @@ A collection of SystemVerilog digital design modules, testbenches, simulation wa
 
 ```text
 System-Verilog/
+├── FullAdder_4bit_SV/
+│   ├── design.sv                                           # 4-bit registered full adder DUT
+│   ├── interface.sv                                        # Interface definition (clk, rst, valid, a[3:0], b[3:0], cin, sum[3:0], cout)
+│   ├── transaction.sv                                      # Transaction class with dual decimal/hex display
+│   ├── generator.sv                                        # Generator producing randomized 4-bit transaction packets
+│   ├── driver.sv                                           # Driver translating transactions to interface pins
+│   ├── monitor.sv                                          # Monitor sampling 4-bit adder inputs and registered outputs
+│   ├── scoreboard.sv                                       # Golden reference model verifying sum and carry
+│   ├── environment.sv                                      # Phased testbench environment orchestrator
+│   ├── test.sv                                             # Test program configuring repeat_count & initiating run
+│   ├── testbench.sv                                        # Top-level testbench module instantiating interface, DUT & test
+│   └── waveform_4bit_fa.png                                # EPWave simulation waveform
 ├── FullAdder_SV/
 │   ├── full_adder.sv.txt                                   # 1-bit registered full adder DUT
 │   ├── interface.sv.txt                                    # Interface definition (clk, rst, valid, a, b, cin, sum, cout)
@@ -48,7 +60,68 @@ System-Verilog/
 
 ## 📌 Projects & Modules
 
-### 1. Full Adder Layered Verification Environment (`FullAdder_SV/`)
+### 1. 4-Bit Full Adder Layered Verification Environment (`FullAdder_4bit_SV/`)
+
+A 4-bit synchronous binary vector full adder design verified using a complete object-oriented, constrained-random layered testbench.
+
+#### A. Design Under Test (DUT - `design.sv`)
+- **Arithmetic Function:** Computes 4-bit addition with carry-in: $\{ \text{cout}, \text{sum}[3:0] \} = a[3:0] + b[3:0] + \text{cin}$.
+- **Bit-Width Range:** Operands $a, b \in [0, 15]$, $\text{cin} \in [0, 1]$; maximum result is $15 + 15 + 1 = 31$ (`5'b11111`), stored in `tmp_out[4:0]`.
+- **Clock Edge & Reset:** Uses `always_ff @(posedge clk or posedge rst)` with asynchronous active-high reset.
+- **Valid Enable Handshake:** Computes and updates output registers only when `valid = 1`.
+
+##### Port List
+
+| Port Name | Direction | Width | Description |
+| :--- | :---: | :---: | :--- |
+| `clk` | Input | 1 bit | System clock signal (period = 10ns) |
+| `rst` | Input | 1 bit | Asynchronous active-high reset |
+| `valid` | Input | 1 bit | Input data valid handshake |
+| `a` | Input | 4 bits | 4-bit operand input A (`[3:0]`) |
+| `b` | Input | 4 bits | 4-bit operand input B (`[3:0]`) |
+| `cin` | Input | 1 bit | Carry-in signal |
+| `sum` | Output | 4 bits | Registered 4-bit sum output (`[3:0]`) |
+| `cout` | Output | 1 bit | Registered carry-out bit |
+
+#### B. Verification Components Breakdown
+
+| Component | File | Description |
+| :--- | :--- | :--- |
+| **Transaction** | `transaction.sv` | Generates randomized 4-bit inputs (`rand bit [3:0] a, b`, `rand bit cin`) and response containers with dual decimal/binary formatting. |
+| **Interface** | `interface.sv` | Bundles `clk`, `rst`, `valid`, `a[3:0]`, `b[3:0]`, `cin`, `sum[3:0]`, `cout` into `intf`. |
+| **Generator** | `generator.sv` | Generates 15 randomized transaction packets, checks `.randomize()`, pushes to `mailbox gen2driv`, and triggers `->ended`. |
+| **Driver** | `driver.sv` | Executes reset sequence, pulls transactions from `gen2driv`, and drives synchronous pin wiggles on clock rising edges. |
+| **Monitor** | `monitor.sv` | Passively samples `vif` pins on clock edges when `valid` is asserted and captures registered outputs on the next clock edge into `mailbox mon2scb`. |
+| **Scoreboard** | `scoreboard.sv` | Reference model computing $\{ \text{exp\_cout}, \text{exp\_sum} \} = a + b + \text{cin}$ and checking equality with actual outputs. |
+| **Environment** | `environment.sv` | Orchestrates four-phase lifecycle: `pre_test` $\rightarrow$ `test` $\rightarrow$ `post_test` $\rightarrow$ `run`. |
+| **Test Program** | `test.sv` | Configures `repeat_count = 15` and initiates simulation execution. |
+| **Top Testbench** | `testbench.sv` | Module `top` generating master clock (`always #5 clk = ~clk;`), reset pulse, and instantiating DUT, interface, and test. |
+
+#### C. Simulation Waveform Analysis
+
+![4-Bit Full Adder Waveform](FullAdder_4bit_SV/waveform_4bit_fa.png)
+
+##### Waveform Trace Highlights:
+1. **At ~50ns**:
+   - Inputs: $a = \text{4'hd}\ (13)$, $b = \text{4'h2}\ (2)$, $\text{cin} = 1$
+   - Calculation: $13 + 2 + 1 = 16 = \text{5'h10}$
+   - Registered output `tmp_out[4:0] = 5'h10` $\rightarrow$ `cout = 1`, `sum = 4'h0`.
+2. **At ~80ns**:
+   - Inputs: $a = \text{4'h6}\ (6)$, $b = \text{4'h4}\ (4)$, $\text{cin} = 0$
+   - Calculation: $6 + 4 + 0 = 10 = \text{5'h0a}$
+   - Registered output `tmp_out[4:0] = 5'h0a` $\rightarrow$ `cout = 0`, `sum = 4'ha` (10).
+3. **At ~110ns**:
+   - Inputs: $a = \text{4'hf}\ (15)$, $b = \text{4'hb}\ (11)$, $\text{cin} = 0$
+   - Calculation: $15 + 11 + 0 = 26 = \text{5'h1a}$
+   - Registered output `tmp_out[4:0] = 5'h1a` $\rightarrow$ `cout = 1`, `sum = 4'ha` (10).
+4. **At ~170ns**:
+   - Inputs: $a = \text{4'hf}\ (15)$, $b = \text{4'hf}\ (15)$, $\text{cin} = 0$
+   - Calculation: $15 + 15 + 0 = 30 = \text{5'h1e}$
+   - Registered output `tmp_out[4:0] = 5'h1e` $\rightarrow$ `cout = 1`, `sum = 4'he` (14).
+
+---
+
+### 2. Full Adder Layered Verification Environment (`FullAdder_SV/`)
 
 A 1-bit synchronous Full Adder design verified using an object-oriented, constrained-random layered testbench architecture.
 
@@ -79,14 +152,14 @@ A 1-bit synchronous Full Adder design verified using an object-oriented, constra
 | **Generator** | `generator.sv.txt` | Generates randomized transactions over `repeat_count` runs, checks `.randomize()`, pushes to `gen2driv`, and triggers `->ended`. |
 | **Driver** | `driver.sv.txt` | Executes reset task, pulls transactions from `gen2driv`, and drives interface pins synchronously with `valid` handshake. |
 | **Monitor** | `monitor.sv.txt` | Passively samples `vif` pins on clock edges when `valid` is high, capturing inputs and outputs into transactions pushed to `mon2scb`. |
-| **Scoreboard** | `scoreboard.sv.txt` | Self-checking golden reference model verifying `{trans.cout, trans.sum} == (trans.a + trans.b + trans.cin)`. |
+| **Scoreboard** | `scoreboard.sv.txt` | Self-checking golden reference model verifying $\{ \text{trans.cout}, \text{trans.sum} \} == (trans.a + trans.b + trans.cin)$. |
 | **Environment** | `environment.sv.txt` | Manages component lifecycles across phases (`pre_test` $\rightarrow$ `test` $\rightarrow$ `post_test` $\rightarrow$ `run`). |
 | **Test Program** | `test.sv.txt` | Configures test parameters (`repeat_count = 10`) and initiates execution via `env.run()`. |
 | **Top Testbench** | `testbench.sv.txt` | Module `top` generating clock (`always #5 clk = ~clk;`) and reset, instantiating `intf`, `full_adder dut`, and `test t1`. |
 
 ---
 
-### 2. Synchronous 4-Bit Adder & Layered Verification Environment (`ADDER_SV/`)
+### 3. Synchronous 4-Bit Adder & Layered Verification Environment (`ADDER_SV/`)
 
 A registered 4-bit binary adder design accompanied by a complete, modular, object-oriented SystemVerilog layered testbench environment following industry-standard verification methodology.
 
@@ -108,62 +181,7 @@ A registered 4-bit binary adder design accompanied by a complete, modular, objec
 | `b` | Input | 4 bits | 4-bit operand input B |
 | `c` | Output | 5 bits | 5-bit registered sum output (`tmp_c[4:0]`) |
 
----
-
-#### B. Layered Testbench Architecture
-
-The testbench structure adopts standard SystemVerilog OOP verification practices with clean separation of concerns across layered components:
-
-```text
-+-------------------------------------------------------------------------------+
-|                                 Environment                                   |
-|                                                                               |
-|  +---------------+      gen2driv      +------------+                          |
-|  |   Generator   | -----------------> |   Driver   |                          |
-|  +---------------+    (mailbox trans) +------------+                          |
-|          |                                   |                                |
-|          | event ended                       | pin-level drive (reset, valid) |
-|          v                                   v                                |
-|    Synchronization                  Virtual Interface (vif)                   |
-|  +-------------------------------------------+-----------------------------+  |
-|  |                  CLK / RST / VALID / A / B / C                          |  |
-|  +-------------------------------------------+-----------------------------+  |
-|                                              |                                |
-|                                              v pin-level sample               |
-|  +---------------+      mon2scb       +------------+                          |
-|  |  Scoreboard   | <----------------- |  Monitor   |                          |
-|  | (ref model &  |    (mailbox trans) +------------+                          |
-|  |  self-check)  |                                                            |
-|  +---------------+                                                            |
-+-------------------------------------------------------------------------------+
-                                       |
-                                       v
-                             +-------------------+
-                             |     DUT (addr)    |
-                             +-------------------+
-```
-
-#### C. Verification Components Breakdown
-
-| Component | File | Description |
-| :--- | :--- | :--- |
-| **Transaction** | `transaction.sv.txt` | Encapsulates stimulus and response fields (`rand bit [3:0] a, b`, `bit [4:0] c`) with custom banner formatting via `display()`. |
-| **Interface** | `interface.sv.txt` | Groups physical signals (`clk`, `rst`, `valid`, `a`, `b`, `c`) into a bundle (`intf`) to eliminate port clutter between modules and classes. |
-| **Generator** | `generator.sv.txt` | Generates randomized transaction packets for `repeat_count` iterations, verifies `.randomize()`, pushes packets into `mailbox gen2driv`, and triggers `->ended`. |
-| **Driver** | `driver.sv.txt` | Pulls transactions from `gen2driv`, handles reset sequencing (`reset` task), and drives synchronous stimulus on clock edges (`vif.valid`, `vif.a`, `vif.b`). |
-| **Monitor** | `monitor.sv.txt` | Passively samples interface lines on clock edges when `vif.valid` is asserted, captures input/output data, and forwards packaged transactions via `mailbox mon2scb`. |
-| **Scoreboard** | `scoreboard.sv.txt` | Self-checking reference model that consumes transactions from `mon2scb`, checks `(trans.a + trans.b) == trans.c`, tracks transaction counts, and reports verification errors. |
-| **Environment** | `environment.sv.txt` | Top-level verification environment that instantiates and connects all components and mailboxes, managing test lifecycle across four phases (`pre_test` $\rightarrow$ `test` $\rightarrow$ `post_test` $\rightarrow$ `run`). |
-| **Test Program** | `test.sv.txt` | Dedicated test container (`program test`) that configures parameters (e.g., `env.gen.repeat_count = 10`) and executes the simulation run. |
-| **Top Testbench** | `testbench.sv.txt` | Top-level module (`module top`) generating `clk` and `rst`, instantiating the physical interface (`intf i_intf`), DUT (`addr dut`), and test block (`test t1`), and configuring VCD dumping. |
-
-##### Environment Phase Flow
-1. **`pre_test()`**: Invokes driver reset sequence (`driv.reset()`) to place the DUT in a known state.
-2. **`test()`**: Concurrently executes `gen.main()`, `driv.main()`, `mon.main()`, and `scb.main()` inside a `fork ... join_any` block.
-3. **`post_test()`**: Synchronizes completion by waiting on `gen.ended.triggered` and validating that `repeat_count` equals both driver transactions and scoreboard checked transactions.
-4. **`run()`**: Orchestrates `pre_test()` $\rightarrow$ `test()` $\rightarrow$ `post_test()` and terminates cleanly via `$finish`.
-
-#### D. Simulation Waveforms & Verification Output
+#### B. Simulation Waveforms & Verification Output
 
 ##### Layered Testbench Simulation Waveform
 ![Layered Testbench Waveform](ADDER_SV/Screenshot%202026-11-15%20101912.png)
@@ -173,7 +191,7 @@ The testbench structure adopts standard SystemVerilog OOP verification practices
 
 ---
 
-### 3. 4-Bit Up/Down Counter (`up_down_counter/`)
+### 4. 4-Bit Up/Down Counter (`up_down_counter/`)
 
 A 4-bit synchronous binary counter capable of counting up or down based on a control input.
 
@@ -200,14 +218,9 @@ A 4-bit synchronous binary counter capable of counting up or down based on a con
 
 ---
 
-### 4. Blocking vs Non-Blocking Assignment Comparison (`blocking vs non_blocking/`)
+### 5. Blocking vs Non-Blocking Assignment Comparison (`blocking vs non_blocking/`)
 
 Demonstrates and compares the behavior of **Blocking (`=`)** and **Non-Blocking (`<=`)** procedural assignments in sequential logic blocks.
-
-#### Modules Implemented
-- `blocking_counter`: Uses blocking procedural assignments (`=`) inside `always @(posedge clk)`.
-- `nonblocking_counter`: Uses non-blocking procedural assignments (`<=`) inside `always @(posedge clk)`.
-- `tb`: Testbench instantiating both designs simultaneously with identical clock and control inputs to compare outputs side-by-side.
 
 #### Key Concept Comparison
 
@@ -216,10 +229,6 @@ Demonstrates and compares the behavior of **Blocking (`=`)** and **Non-Blocking 
 | **Execution Order** | Evaluated and assigned immediately in sequential order | Right-hand side (RHS) evaluated first; scheduled to update in the NBA region |
 | **Synthesized Logic** | Typically used for combinational logic (`always_comb` / `always @*`) | Recommended standard for sequential logic (`always_ff` / `always @(posedge clk)`) |
 | **Race Conditions** | Can cause simulation race conditions and mismatch between RTL and gate-level netlists | Eliminates race conditions across communicating synchronous flip-flops |
-
-> **Best Practice Rule:**
-> - Use non-blocking assignments (`<=`) when modeling sequential logic (registers / flip-flops).
-> - Use blocking assignments (`=`) when modeling combinational logic.
 
 #### Simulation Waveform
 
@@ -240,31 +249,25 @@ You can simulate these files using standard EDA tools or online simulators like 
 
 ### Using Icarus Verilog (`iverilog`) & GTKWave
 
-1. **Compile and Run:**
-   ```bash
-   # For Full Layered Full Adder Testbench
-   iverilog -g2012 -o fa_tb_sim FullAdder_SV/full_adder.sv.txt FullAdder_SV/testbench.sv.txt
-   vvp fa_tb_sim
+```bash
+# For 4-Bit Full Adder Layered Testbench
+iverilog -g2012 -o fa4_sim FullAdder_4bit_SV/design.sv FullAdder_4bit_SV/testbench.sv
+vvp fa4_sim
 
-   # For Full Layered 4-bit Adder Testbench
-   iverilog -g2012 -o adder_tb_sim ADDER_SV/adder.sv.txt ADDER_SV/testbench.sv.txt
-   vvp adder_tb_sim
+# For 1-Bit Full Adder Layered Testbench
+iverilog -g2012 -o fa_tb_sim FullAdder_SV/full_adder.sv.txt FullAdder_SV/testbench.sv.txt
+vvp fa_tb_sim
 
-   # For 4-bit Up/Down Counter
-   iverilog -g2012 -o counter_sim up_down_counter/up_down.sv.txt
-   vvp counter_sim
+# For 4-Bit Adder Testbench
+iverilog -g2012 -o adder_tb_sim ADDER_SV/adder.sv.txt ADDER_SV/testbench.sv.txt
+vvp adder_tb_sim
 
-   # For Blocking vs Non-Blocking Comparison
-   iverilog -g2012 -o b_vs_nb_sim "blocking vs non_blocking/blocking_vs non_blocking.sv.txt"
-   vvp b_vs_nb_sim
-   ```
+# For 4-Bit Up/Down Counter
+iverilog -g2012 -o counter_sim up_down_counter/up_down.sv.txt
+vvp counter_sim
+```
 
-2. **View VCD Waveform:**
-   ```bash
-   gtkwave dump.vcd
-   ```
-
-### Using ModelSim / QuestaSim / Vivado / VCS / EDA Playground
-1. Add or paste the design and testbench files as SystemVerilog sources.
-2. Ensure `top` is designated as the top-level simulation module (`top`).
-3. Run simulation (`run -all`) and view the scoreboard verification logs and waveforms.
+### Using Synopsys VCS / Cadence Xcelium / ModelSim / EDA Playground
+1. Paste `design.sv` in the design pane and other testbench files in their respective tabs.
+2. Select **Synopsys VCS** (or **Cadence Xcelium** with `run.do`).
+3. Check **Open EPWave after run** to view interactive waveforms.
