@@ -1,14 +1,12 @@
-'include "environment.sv"
+`include "environment.sv"
 
-//program can replaced by module as well 
-program test (intf i_intf ) ;
-  
+program test (intf i_intf);
+ 
   environment env;
-  
+ 
   initial begin
-    env = new (i_intf);
+    env = new(i_intf);
     env.gen.repeat_count = 10;
     env.run();
   end
 endprogram
-

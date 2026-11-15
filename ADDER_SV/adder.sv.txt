@@ -8,11 +8,11 @@ module addr (
   output reg [4:0] c
 );
   reg [8:0] tmp_c;
-  always_ff @(posedge clk orposedge rst) begin
+  always_ff @(posedge clk or posedge rst) begin
     if(rst)
       tmp_c <= 0;
     else if(valid)
       tmp_c <= a+b;
   end
   assign c = tmp_c;
-endmodule  
+endmodule 
