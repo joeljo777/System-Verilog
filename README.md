@@ -9,24 +9,27 @@ A collection of SystemVerilog digital design modules, testbenches, simulation wa
 ```text
 System-Verilog/
 ├── ADDER_SV/
-│   ├── adder.sv.txt                       # Registered 4-bit adder DUT with valid handshake & async reset
-│   ├── interface.sv.txt                   # Interface definition connecting testbench and DUT
-│   ├── transaction.sv.txt                 # Transaction class with randomized stimulus (a, b) and response (c)
-│   ├── generator.sv.txt                   # Generator class producing randomized transactions
-│   ├── driver.sv.txt                      # Driver class converting transactions to interface pin wiggles
-│   ├── monitor.sv.txt                     # Monitor class sampling pin activity and packaging transactions
-│   ├── scoreboard.sv.txt                  # Scoreboard class verifying DUT outputs against reference model
-│   ├── environment.sv.txt                 # Environment class orchestrating TB components and phases
-│   ├── test.sv.txt                        # Top-level test program configuring and starting the test
-│   └── Screenshot 2026-11-14 153845.png  # Simulation waveform
+│   ├── adder.sv.txt                                        # Registered 4-bit adder DUT with valid handshake & async reset
+│   ├── interface.sv.txt                                    # Interface definition connecting testbench and DUT
+│   ├── transaction.sv.txt                                  # Transaction class with randomized stimulus (a, b) and response (c)
+│   ├── generator.sv.txt                                    # Generator class producing randomized transactions
+│   ├── driver.sv.txt                                       # Driver class converting transactions to interface pin wiggles
+│   ├── monitor.sv.txt                                      # Monitor class sampling pin activity and packaging transactions
+│   ├── scoreboard.sv.txt                                   # Scoreboard class verifying DUT outputs against reference model
+│   ├── environment.sv.txt                                  # Environment class orchestrating TB components and phases
+│   ├── test.sv.txt                                         # Test program configuring test parameters
+│   ├── testbench.sv.txt                                    # Top-level testbench module instantiating DUT, interface & test
+│   ├── Screenshot 2026-11-14 153845.png                   # Initial adder waveform
+│   ├── Screenshot 2026-11-15 101912.png                   # Layered testbench simulation waveform
+│   └── WhatsApp Image 2026-11-15 at 10.20.29 AM.jpeg       # Simulation output & test execution log
 ├── up_down_counter/
-│   ├── up_down.sv.txt                     # 4-bit synchronous up/down counter design & testbench
-│   └── Screenshot 2026-11-14 113728.png  # Simulation waveform
+│   ├── up_down.sv.txt                                      # 4-bit synchronous up/down counter design & testbench
+│   └── Screenshot 2026-11-14 113728.png                   # Simulation waveform
 ├── blocking vs non_blocking/
-│   ├── blocking_vs non_blocking.sv.txt   # Comparison between blocking (=) & non-blocking (<=)
-│   └── Screenshot 2026-11-14 111457.png  # Comparative simulation waveform
-├── Verilog_SystemVerilog_Study_Notes.docx # Comprehensive study & interview notes
-├── Sysyem_Verilog.png                     # SystemVerilog architecture & reference diagram
+│   ├── blocking_vs non_blocking.sv.txt                    # Comparison between blocking (=) & non-blocking (<=)
+│   └── Screenshot 2026-11-14 111457.png                   # Comparative simulation waveform
+├── Verilog_SystemVerilog_Study_Notes.docx                  # Comprehensive study & interview notes
+├── Sysyem_Verilog.png                                      # SystemVerilog architecture & reference diagram
 └── README.md
 ```
 
@@ -36,7 +39,7 @@ System-Verilog/
 
 ### 1. Synchronous 4-Bit Adder & Layered Verification Environment (`ADDER_SV/`)
 
-A registered 4-bit binary adder design accompanied by a modular, object-oriented SystemVerilog layered testbench environment following industry-standard verification methodology.
+A registered 4-bit binary adder design accompanied by a complete, modular, object-oriented SystemVerilog layered testbench environment following industry-standard verification methodology.
 
 #### A. Design Under Test (DUT - `adder.sv.txt`)
 - **Bit-width:** Adds two 4-bit inputs (`a[3:0]`, `b[3:0]`) producing a 5-bit registered sum output (`c[4:0]`) to accommodate carry-out.
@@ -60,7 +63,7 @@ A registered 4-bit binary adder design accompanied by a modular, object-oriented
 
 #### B. Layered Testbench Architecture
 
-The testbench structure adopts standard SystemVerilog OOP verification practices with clear separation of concerns across layered components:
+The testbench structure adopts standard SystemVerilog OOP verification practices with clean separation of concerns across layered components:
 
 ```text
 +-------------------------------------------------------------------------------+
@@ -103,6 +106,7 @@ The testbench structure adopts standard SystemVerilog OOP verification practices
 | **Scoreboard** | `scoreboard.sv.txt` | Self-checking reference model that consumes transactions from `mon2scb`, checks `(trans.a + trans.b) == trans.c`, tracks transaction counts, and reports verification errors. |
 | **Environment** | `environment.sv.txt` | Top-level verification environment that instantiates and connects all components and mailboxes, managing test lifecycle across four phases (`pre_test` $\rightarrow$ `test` $\rightarrow$ `post_test` $\rightarrow$ `run`). |
 | **Test Program** | `test.sv.txt` | Dedicated test container (`program test`) that configures parameters (e.g., `env.gen.repeat_count = 10`) and executes the simulation run. |
+| **Top Testbench** | `testbench.sv.txt` | Top-level module (`module top`) generating `clk` and `rst`, instantiating the physical interface (`intf i_intf`), DUT (`addr dut`), and test block (`test t1`), and configuring VCD dumping. |
 
 ##### Environment Phase Flow
 1. **`pre_test()`**: Invokes driver reset sequence (`driv.reset()`) to place the DUT in a known state.
@@ -110,9 +114,13 @@ The testbench structure adopts standard SystemVerilog OOP verification practices
 3. **`post_test()`**: Synchronizes completion by waiting on `gen.ended.triggered` and validating that `repeat_count` equals both driver transactions and scoreboard checked transactions.
 4. **`run()`**: Orchestrates `pre_test()` $\rightarrow$ `test()` $\rightarrow$ `post_test()` and terminates cleanly via `$finish`.
 
-#### D. Simulation Waveform
+#### D. Simulation Waveforms & Verification Output
 
-![Adder Simulation Waveform](ADDER_SV/Screenshot%202026-11-14%20153845.png)
+##### Layered Testbench Simulation Waveform
+![Layered Testbench Waveform](ADDER_SV/Screenshot%202026-11-15%20101912.png)
+
+##### Verification Execution Log & Waveform Details
+![Execution Log and Waveform](ADDER_SV/WhatsApp%20Image%202026-11-15%20at%2010.20.29%20AM.jpeg)
 
 ---
 
@@ -185,9 +193,9 @@ You can simulate these files using standard EDA tools or online simulators like 
 
 1. **Compile and Run:**
    ```bash
-   # For Registered 4-bit Adder & Testbench
-   iverilog -g2012 -o adder_sim ADDER_SV/adder.sv.txt
-   vvp adder_sim
+   # For Full Layered Adder Testbench
+   iverilog -g2012 -o adder_tb_sim ADDER_SV/adder.sv.txt ADDER_SV/testbench.sv.txt
+   vvp adder_tb_sim
 
    # For 4-bit Up/Down Counter
    iverilog -g2012 -o counter_sim up_down_counter/up_down.sv.txt
@@ -200,10 +208,10 @@ You can simulate these files using standard EDA tools or online simulators like 
 
 2. **View VCD Waveform:**
    ```bash
-   gtkwave dump.vcd
+   gtkwave ex.vcd
    ```
 
-### Using ModelSim / QuestaSim / Vivado / VCS
-1. Add design and testbench files as SystemVerilog sources.
-2. Compile and set the top-level testbench (`tb` or top-level testbench module).
-3. Run simulation (`run -all`) and inspect scoreboard reports, monitors, and waveform outputs.
+### Using ModelSim / QuestaSim / Vivado / VCS / EDA Playground
+1. Add or paste the design and testbench files as SystemVerilog sources.
+2. Ensure `top` is designated as the top-level simulation module (`top`).
+3. Run simulation (`run -all`) and view the scoreboard verification logs and waveforms.
