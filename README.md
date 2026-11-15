@@ -1,6 +1,6 @@
 # SystemVerilog Design & Verification
 
-A collection of SystemVerilog digital design modules, testbenches, simulation waveforms, and study notes demonstrating fundamental hardware description and verification concepts.
+A collection of SystemVerilog digital design modules, testbenches, simulation waveforms, and study notes demonstrating fundamental hardware description and layered verification concepts.
 
 ---
 
@@ -9,10 +9,15 @@ A collection of SystemVerilog digital design modules, testbenches, simulation wa
 ```text
 System-Verilog/
 ├── ADDER_SV/
-│   ├── adder.sv.txt                       # Registered 4-bit adder with valid handshake & async reset
-│   ├── transaction.sv.txt                 # Transaction class with randomized stimuli (a, b)
+│   ├── adder.sv.txt                       # Registered 4-bit adder DUT with valid handshake & async reset
 │   ├── interface.sv.txt                   # Interface definition connecting testbench and DUT
+│   ├── transaction.sv.txt                 # Transaction class with randomized stimulus (a, b) and response (c)
 │   ├── generator.sv.txt                   # Generator class producing randomized transactions
+│   ├── driver.sv.txt                      # Driver class converting transactions to interface pin wiggles
+│   ├── monitor.sv.txt                     # Monitor class sampling pin activity and packaging transactions
+│   ├── scoreboard.sv.txt                  # Scoreboard class verifying DUT outputs against reference model
+│   ├── environment.sv.txt                 # Environment class orchestrating TB components and phases
+│   ├── test.sv.txt                        # Top-level test program configuring and starting the test
 │   └── Screenshot 2026-11-14 153845.png  # Simulation waveform
 ├── up_down_counter/
 │   ├── up_down.sv.txt                     # 4-bit synchronous up/down counter design & testbench
@@ -31,7 +36,7 @@ System-Verilog/
 
 ### 1. Synchronous 4-Bit Adder & Layered Verification Environment (`ADDER_SV/`)
 
-A registered 4-bit binary adder design accompanied by a modular, object-oriented SystemVerilog layered testbench environment.
+A registered 4-bit binary adder design accompanied by a modular, object-oriented SystemVerilog layered testbench environment following industry-standard verification methodology.
 
 #### A. Design Under Test (DUT - `adder.sv.txt`)
 - **Bit-width:** Adds two 4-bit inputs (`a[3:0]`, `b[3:0]`) producing a 5-bit registered sum output (`c[4:0]`) to accommodate carry-out.
@@ -51,33 +56,61 @@ A registered 4-bit binary adder design accompanied by a modular, object-oriented
 | `b` | Input | 4 bits | 4-bit operand input B |
 | `c` | Output | 5 bits | 5-bit registered sum output (`tmp_c[4:0]`) |
 
+---
+
 #### B. Layered Testbench Architecture
 
-The testbench structure adopts standard SystemVerilog OOP verification practices:
+The testbench structure adopts standard SystemVerilog OOP verification practices with clear separation of concerns across layered components:
 
 ```text
-+------------------+          +---------+          +--------+
-|    Generator     | -------> | Mailbox | -------> | Driver | ---> Interface ---> DUT
-| (random stimuli) |  (trans) |         |  (trans) |        |      (inf)      (addr)
-+------------------+          +---------+          +--------+
-         |
-         v
-    event ended (completion)
++-------------------------------------------------------------------------------+
+|                                 Environment                                   |
+|                                                                               |
+|  +---------------+      gen2driv      +------------+                          |
+|  |   Generator   | -----------------> |   Driver   |                          |
+|  +---------------+    (mailbox trans) +------------+                          |
+|          |                                   |                                |
+|          | event ended                       | pin-level drive (reset, valid) |
+|          v                                   v                                |
+|    Synchronization                  Virtual Interface (vif)                   |
+|  +-------------------------------------------+-----------------------------+  |
+|  |                  CLK / RST / VALID / A / B / C                          |  |
+|  +-------------------------------------------+-----------------------------+  |
+|                                              |                                |
+|                                              v pin-level sample               |
+|  +---------------+      mon2scb       +------------+                          |
+|  |  Scoreboard   | <----------------- |  Monitor   |                          |
+|  | (ref model &  |    (mailbox trans) +------------+                          |
+|  |  self-check)  |                                                            |
+|  +---------------+                                                            |
++-------------------------------------------------------------------------------+
+                                       |
+                                       v
+                             +-------------------+
+                             |     DUT (addr)    |
+                             +-------------------+
 ```
 
-- **Transaction (`transaction.sv.txt`):**
-  - Defines the transaction packet containing randomized stimulus variables (`rand bit [3:0] a, b`) and response container (`bit [4:0] c`).
-  - Implements a `display(string name)` helper method for consistent simulation logging.
-- **Interface (`interface.sv.txt`):**
-  - Encapsulates the pin-level connectivity (`valid`, `a`, `b`, `c`) with `clk` and `rst`.
-  - Simplifies DUT-to-testbench connections and avoids wiring clutter.
-- **Generator (`generator.sv.txt`):**
-  - Generates randomized transactions over `repeat_count` iterations.
-  - Verifies randomization success using `if(!trans.randomize()) $fatal(...)`.
-  - Transmits transaction objects to the driver via `mailbox gen2driv.put(trans)`.
-  - Triggers `->ended` event to signal when all stimuli have been dispatched.
+#### C. Verification Components Breakdown
 
-#### C. Simulation Waveform
+| Component | File | Description |
+| :--- | :--- | :--- |
+| **Transaction** | `transaction.sv.txt` | Encapsulates stimulus and response fields (`rand bit [3:0] a, b`, `bit [4:0] c`) with custom banner formatting via `display()`. |
+| **Interface** | `interface.sv.txt` | Groups physical signals (`clk`, `rst`, `valid`, `a`, `b`, `c`) into a bundle (`intf`) to eliminate port clutter between modules and classes. |
+| **Generator** | `generator.sv.txt` | Generates randomized transaction packets for `repeat_count` iterations, verifies `.randomize()`, pushes packets into `mailbox gen2driv`, and triggers `->ended`. |
+| **Driver** | `driver.sv.txt` | Pulls transactions from `gen2driv`, handles reset sequencing (`reset` task), and drives synchronous stimulus on clock edges (`vif.valid`, `vif.a`, `vif.b`). |
+| **Monitor** | `monitor.sv.txt` | Passively samples interface lines on clock edges when `vif.valid` is asserted, captures input/output data, and forwards packaged transactions via `mailbox mon2scb`. |
+| **Scoreboard** | `scoreboard.sv.txt` | Self-checking reference model that consumes transactions from `mon2scb`, checks `(trans.a + trans.b) == trans.c`, tracks transaction counts, and reports verification errors. |
+| **Environment** | `environment.sv.txt` | Top-level verification environment that instantiates and connects all components and mailboxes, managing test lifecycle across four phases (`pre_test` $\rightarrow$ `test` $\rightarrow$ `post_test` $\rightarrow$ `run`). |
+| **Test Program** | `test.sv.txt` | Dedicated test container (`program test`) that configures parameters (e.g., `env.gen.repeat_count = 10`) and executes the simulation run. |
+
+##### Environment Phase Flow
+1. **`pre_test()`**: Invokes driver reset sequence (`driv.reset()`) to place the DUT in a known state.
+2. **`test()`**: Concurrently executes `gen.main()`, `driv.main()`, `mon.main()`, and `scb.main()` inside a `fork ... join_any` block.
+3. **`post_test()`**: Synchronizes completion by waiting on `gen.ended.triggered` and validating that `repeat_count` equals both driver transactions and scoreboard checked transactions.
+4. **`run()`**: Orchestrates `pre_test()` $\rightarrow$ `test()` $\rightarrow$ `post_test()` and terminates cleanly via `$finish`.
+
+#### D. Simulation Waveform
 
 ![Adder Simulation Waveform](ADDER_SV/Screenshot%202026-11-14%20153845.png)
 
@@ -152,7 +185,7 @@ You can simulate these files using standard EDA tools or online simulators like 
 
 1. **Compile and Run:**
    ```bash
-   # For Registered 4-bit Adder
+   # For Registered 4-bit Adder & Testbench
    iverilog -g2012 -o adder_sim ADDER_SV/adder.sv.txt
    vvp adder_sim
 
@@ -170,7 +203,7 @@ You can simulate these files using standard EDA tools or online simulators like 
    gtkwave dump.vcd
    ```
 
-### Using ModelSim / QuestaSim / Vivado
-1. Add the design file as a SystemVerilog source.
-2. Compile and set the top-level module to the respective testbench (`tb`).
-3. Run simulation (`run -all`) and inspect the waveform and console monitor outputs.
+### Using ModelSim / QuestaSim / Vivado / VCS
+1. Add design and testbench files as SystemVerilog sources.
+2. Compile and set the top-level testbench (`tb` or top-level testbench module).
+3. Run simulation (`run -all`) and inspect scoreboard reports, monitors, and waveform outputs.
