@@ -1,6 +1,6 @@
 # SystemVerilog Design & Verification
 
-A collection of SystemVerilog digital design modules, testbenches, and simulation examples demonstrating fundamental hardware description concepts.
+A collection of SystemVerilog digital design modules, testbenches, simulation waveforms, and study notes demonstrating fundamental hardware description and verification concepts.
 
 ---
 
@@ -8,12 +8,20 @@ A collection of SystemVerilog digital design modules, testbenches, and simulatio
 
 ```text
 System-Verilog/
+├── ADDER_SV/
+│   ├── adder.sv.txt                       # Registered 4-bit adder with valid handshake & async reset
+│   ├── transaction.sv.txt                 # Transaction class with randomized stimuli (a, b)
+│   ├── interface.sv.txt                   # Interface definition connecting testbench and DUT
+│   ├── generator.sv.txt                   # Generator class producing randomized transactions
+│   └── Screenshot 2026-11-14 153845.png  # Simulation waveform
 ├── up_down_counter/
 │   ├── up_down.sv.txt                     # 4-bit synchronous up/down counter design & testbench
 │   └── Screenshot 2026-11-14 113728.png  # Simulation waveform
 ├── blocking vs non_blocking/
 │   ├── blocking_vs non_blocking.sv.txt   # Comparison between blocking (=) & non-blocking (<=)
 │   └── Screenshot 2026-11-14 111457.png  # Comparative simulation waveform
+├── Verilog_SystemVerilog_Study_Notes.docx # Comprehensive study & interview notes
+├── Sysyem_Verilog.png                     # SystemVerilog architecture & reference diagram
 └── README.md
 ```
 
@@ -21,7 +29,35 @@ System-Verilog/
 
 ## 📌 Projects & Modules
 
-### 1. 4-Bit Up/Down Counter (`up_down_counter/`)
+### 1. Synchronous 4-Bit Adder with Valid Handshake (`ADDER_SV/`)
+
+A registered 4-bit binary adder utilizing `always_ff` with asynchronous active-high reset and a `valid` control signal.
+
+#### Features
+- **Bit-width:** Adds two 4-bit inputs (`a[3:0]`, `b[3:0]`) producing a 5-bit sum output (`c[4:0]`) to accommodate carry-out.
+- **Clock Edge & Reset:** Uses `always_ff @(posedge clk or posedge rst)` for sequential registered logic with asynchronous reset.
+- **Valid Enable (`valid`):** Computes and stores the sum `a + b` into the internal register `tmp_c` only when `valid = 1`.
+- **Registered Output:** Output `c` is continuously assigned from the registered intermediate sum `tmp_c`.
+
+#### Port List
+
+| Port Name | Direction | Width | Description |
+| :--- | :---: | :---: | :--- |
+| `clk` | Input | 1 bit | System clock signal |
+| `rst` | Input | 1 bit | Asynchronous active-high reset |
+| `valid` | Input | 1 bit | Input data valid flag (enables addition) |
+| `cin` | Input | 1 bit | Carry-in signal |
+| `a` | Input | 4 bits | 4-bit operand input A |
+| `b` | Input | 4 bits | 4-bit operand input B |
+| `c` | Output | 5 bits | 5-bit registered sum output (`tmp_c[4:0]`) |
+
+#### Simulation Waveform
+
+![Adder Simulation Waveform](ADDER_SV/Screenshot%202026-11-14%20153845.png)
+
+---
+
+### 2. 4-Bit Up/Down Counter (`up_down_counter/`)
 
 A 4-bit synchronous binary counter capable of counting up or down based on a control input.
 
@@ -48,9 +84,9 @@ A 4-bit synchronous binary counter capable of counting up or down based on a con
 
 ---
 
-### 2. Blocking vs Non-Blocking Assignment Comparison (`blocking vs non_blocking/`)
+### 3. Blocking vs Non-Blocking Assignment Comparison (`blocking vs non_blocking/`)
 
-This module demonstrates and compares the behavior of **Blocking (`=`)** and **Non-Blocking (`<=`)** procedural assignments in sequential logic blocks.
+Demonstrates and compares the behavior of **Blocking (`=`)** and **Non-Blocking (`<=`)** procedural assignments in sequential logic blocks.
 
 #### Modules Implemented
 - `blocking_counter`: Uses blocking procedural assignments (`=`) inside `always @(posedge clk)`.
@@ -75,6 +111,13 @@ This module demonstrates and compares the behavior of **Blocking (`=`)** and **N
 
 ---
 
+## 📚 Study Notes & Reference Materials
+
+- **`Verilog_SystemVerilog_Study_Notes.docx`**: In-depth reference notes covering data types, procedural blocks (`always_comb`, `always_ff`, `always_latch`), OOP in SystemVerilog, constraints, randomization, and verification concepts.
+- **`Sysyem_Verilog.png`**: High-level visual cheat sheet / diagram outlining key language constructs and verification architecture.
+
+---
+
 ## 🚀 How to Run and Simulate
 
 You can simulate these files using standard EDA tools or online simulators like [EDA Playground](https://www.edaplayground.com/):
@@ -83,6 +126,10 @@ You can simulate these files using standard EDA tools or online simulators like 
 
 1. **Compile and Run:**
    ```bash
+   # For Registered 4-bit Adder
+   iverilog -g2012 -o adder_sim ADDER_SV/adder.sv.txt
+   vvp adder_sim
+
    # For 4-bit Up/Down Counter
    iverilog -g2012 -o counter_sim up_down_counter/up_down.sv.txt
    vvp counter_sim
@@ -99,5 +146,5 @@ You can simulate these files using standard EDA tools or online simulators like 
 
 ### Using ModelSim / QuestaSim / Vivado
 1. Add the design file as a SystemVerilog source.
-2. Compile and set the top-level module to `tb`.
+2. Compile and set the top-level module to the respective testbench (`tb`).
 3. Run simulation (`run -all`) and inspect the waveform and console monitor outputs.
