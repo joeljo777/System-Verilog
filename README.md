@@ -29,17 +29,17 @@ System-Verilog/
 
 ## 📌 Projects & Modules
 
-### 1. Synchronous 4-Bit Adder with Valid Handshake (`ADDER_SV/`)
+### 1. Synchronous 4-Bit Adder & Layered Verification Environment (`ADDER_SV/`)
 
-A registered 4-bit binary adder utilizing `always_ff` with asynchronous active-high reset and a `valid` control signal.
+A registered 4-bit binary adder design accompanied by a modular, object-oriented SystemVerilog layered testbench environment.
 
-#### Features
-- **Bit-width:** Adds two 4-bit inputs (`a[3:0]`, `b[3:0]`) producing a 5-bit sum output (`c[4:0]`) to accommodate carry-out.
-- **Clock Edge & Reset:** Uses `always_ff @(posedge clk or posedge rst)` for sequential registered logic with asynchronous reset.
-- **Valid Enable (`valid`):** Computes and stores the sum `a + b` into the internal register `tmp_c` only when `valid = 1`.
-- **Registered Output:** Output `c` is continuously assigned from the registered intermediate sum `tmp_c`.
+#### A. Design Under Test (DUT - `adder.sv.txt`)
+- **Bit-width:** Adds two 4-bit inputs (`a[3:0]`, `b[3:0]`) producing a 5-bit registered sum output (`c[4:0]`) to accommodate carry-out.
+- **Clock Edge & Reset:** Uses `always_ff @(posedge clk or posedge rst)` for sequential registered logic with asynchronous active-high reset.
+- **Valid Enable Handshake (`valid`):** Computes and registers `a + b` into `tmp_c` only when `valid = 1`.
+- **Registered Output:** Continuous assignment `assign c = tmp_c;` safely drives the registered lower 5 bits.
 
-#### Port List
+##### Port List
 
 | Port Name | Direction | Width | Description |
 | :--- | :---: | :---: | :--- |
@@ -51,7 +51,33 @@ A registered 4-bit binary adder utilizing `always_ff` with asynchronous active-h
 | `b` | Input | 4 bits | 4-bit operand input B |
 | `c` | Output | 5 bits | 5-bit registered sum output (`tmp_c[4:0]`) |
 
-#### Simulation Waveform
+#### B. Layered Testbench Architecture
+
+The testbench structure adopts standard SystemVerilog OOP verification practices:
+
+```text
++------------------+          +---------+          +--------+
+|    Generator     | -------> | Mailbox | -------> | Driver | ---> Interface ---> DUT
+| (random stimuli) |  (trans) |         |  (trans) |        |      (inf)      (addr)
++------------------+          +---------+          +--------+
+         |
+         v
+    event ended (completion)
+```
+
+- **Transaction (`transaction.sv.txt`):**
+  - Defines the transaction packet containing randomized stimulus variables (`rand bit [3:0] a, b`) and response container (`bit [4:0] c`).
+  - Implements a `display(string name)` helper method for consistent simulation logging.
+- **Interface (`interface.sv.txt`):**
+  - Encapsulates the pin-level connectivity (`valid`, `a`, `b`, `c`) with `clk` and `rst`.
+  - Simplifies DUT-to-testbench connections and avoids wiring clutter.
+- **Generator (`generator.sv.txt`):**
+  - Generates randomized transactions over `repeat_count` iterations.
+  - Verifies randomization success using `if(!trans.randomize()) $fatal(...)`.
+  - Transmits transaction objects to the driver via `mailbox gen2driv.put(trans)`.
+  - Triggers `->ended` event to signal when all stimuli have been dispatched.
+
+#### C. Simulation Waveform
 
 ![Adder Simulation Waveform](ADDER_SV/Screenshot%202026-11-14%20153845.png)
 
