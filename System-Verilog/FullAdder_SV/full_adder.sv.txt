@@ -1,0 +1,23 @@
+module full_adder (
+    input clk,
+    input rst,
+    input valid,
+    input cin,
+    input a,
+    input b,
+    output sum,
+    output cout
+);
+
+  reg [1:0] tmp_c;
+
+  always_ff @(posedge clk or posedge rst) begin
+    if (rst)
+      tmp_c <= 2'b00;
+    else if (valid)
+      tmp_c <= a + b + cin;
+  end
+
+  assign {cout, sum} = tmp_c;
+
+endmodule

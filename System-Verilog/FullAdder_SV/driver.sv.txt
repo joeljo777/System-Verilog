@@ -1,0 +1,40 @@
+  class driver;
+    int no_transactions;
+    virtual intf vif;
+    mailbox gen2driv;
+
+    function new(virtual intf vif, mailbox gen2driv);
+      this.vif = vif;
+      this.gen2driv = gen2driv;
+    endfunction
+
+    task reset;
+      wait(vif.rst);
+      $display("[driver]--------- reset started -------");
+      vif.a     <= 0;
+      vif.b     <= 0;
+      vif.cin   <= 0;
+      vif.valid <= 0;
+      wait(!vif.rst);
+      $display("[driver]--------- reset ended ---------");
+    endtask
+
+    task main;
+      forever begin
+        transaction trans;
+        gen2driv.get(trans);
+        @(posedge vif.clk);
+        vif.valid <= 1;
+        vif.a     <= trans.a;
+        vif.b     <= trans.b;
+        vif.cin   <= trans.cin;
+        @(posedge vif.clk);
+        vif.valid <= 0;
+        trans.sum  <= vif.sum;
+        trans.cout <= vif.cout;
+        @(posedge vif.clk);
+        trans.display("[driver]");
+        no_transactions++;
+      end
+    endtask
+  endclass

@@ -8,6 +8,17 @@ A collection of SystemVerilog digital design modules, testbenches, simulation wa
 
 ```text
 System-Verilog/
+├── FullAdder_SV/
+│   ├── full_adder.sv.txt                                   # 1-bit registered full adder DUT
+│   ├── interface.sv.txt                                    # Interface definition (clk, rst, valid, a, b, cin, sum, cout)
+│   ├── transaction.sv.txt                                  # Transaction class with rand stimulus (a, b, cin) and outputs
+│   ├── generator.sv.txt                                    # Generator producing randomized 1-bit transactions
+│   ├── driver.sv.txt                                       # Driver translating transactions to interface pins
+│   ├── monitor.sv.txt                                      # Monitor passively sampling full adder signals
+│   ├── scoreboard.sv.txt                                   # Scoreboard evaluating {cout, sum} == a + b + cin
+│   ├── environment.sv.txt                                  # Environment orchestrating components & lifecycle
+│   ├── test.sv.txt                                         # Test program configuring repeat_count & initiating run
+│   └── testbench.sv.txt                                    # Top-level module with clock, reset, interface & DUT
 ├── ADDER_SV/
 │   ├── adder.sv.txt                                        # Registered 4-bit adder DUT with valid handshake & async reset
 │   ├── interface.sv.txt                                    # Interface definition connecting testbench and DUT
@@ -37,7 +48,45 @@ System-Verilog/
 
 ## 📌 Projects & Modules
 
-### 1. Synchronous 4-Bit Adder & Layered Verification Environment (`ADDER_SV/`)
+### 1. Full Adder Layered Verification Environment (`FullAdder_SV/`)
+
+A 1-bit synchronous Full Adder design verified using an object-oriented, constrained-random layered testbench architecture.
+
+#### A. Design Under Test (DUT - `full_adder.sv.txt`)
+- **Truth Table / Function:** Computes sum and carry-out: $\{ \text{cout}, \text{sum} \} = a + b + \text{cin}$.
+- **Clock Edge & Reset:** Uses `always_ff @(posedge clk or posedge rst)` with active-high asynchronous reset.
+- **Valid Enable:** Performs addition and updates output registers on `valid = 1`.
+
+##### Port List
+
+| Port Name | Direction | Width | Description |
+| :--- | :---: | :---: | :--- |
+| `clk` | Input | 1 bit | System clock signal |
+| `rst` | Input | 1 bit | Asynchronous active-high reset |
+| `valid` | Input | 1 bit | Input data valid handshake |
+| `a` | Input | 1 bit | Operand A input |
+| `b` | Input | 1 bit | Operand B input |
+| `cin` | Input | 1 bit | Carry-in input |
+| `sum` | Output | 1 bit | Registered sum output ($a \oplus b \oplus \text{cin}$) |
+| `cout` | Output | 1 bit | Registered carry-out output ($(a \cdot b) + (b \cdot \text{cin}) + (a \cdot \text{cin})$) |
+
+#### B. Verification Components Breakdown
+
+| Component | File | Description |
+| :--- | :--- | :--- |
+| **Transaction** | `transaction.sv.txt` | Encapsulates 1-bit stimuli (`rand bit a, b, cin`) and outputs (`bit sum, cout`) with custom banner formatting. |
+| **Interface** | `interface.sv.txt` | Groups physical signals (`clk`, `rst`, `valid`, `a`, `b`, `cin`, `sum`, `cout`) in `intf`. |
+| **Generator** | `generator.sv.txt` | Generates randomized transactions over `repeat_count` runs, checks `.randomize()`, pushes to `gen2driv`, and triggers `->ended`. |
+| **Driver** | `driver.sv.txt` | Executes reset task, pulls transactions from `gen2driv`, and drives interface pins synchronously with `valid` handshake. |
+| **Monitor** | `monitor.sv.txt` | Passively samples `vif` pins on clock edges when `valid` is high, capturing inputs and outputs into transactions pushed to `mon2scb`. |
+| **Scoreboard** | `scoreboard.sv.txt` | Self-checking golden reference model verifying `{trans.cout, trans.sum} == (trans.a + trans.b + trans.cin)`. |
+| **Environment** | `environment.sv.txt` | Manages component lifecycles across phases (`pre_test` $\rightarrow$ `test` $\rightarrow$ `post_test` $\rightarrow$ `run`). |
+| **Test Program** | `test.sv.txt` | Configures test parameters (`repeat_count = 10`) and initiates execution via `env.run()`. |
+| **Top Testbench** | `testbench.sv.txt` | Module `top` generating clock (`always #5 clk = ~clk;`) and reset, instantiating `intf`, `full_adder dut`, and `test t1`. |
+
+---
+
+### 2. Synchronous 4-Bit Adder & Layered Verification Environment (`ADDER_SV/`)
 
 A registered 4-bit binary adder design accompanied by a complete, modular, object-oriented SystemVerilog layered testbench environment following industry-standard verification methodology.
 
@@ -124,7 +173,7 @@ The testbench structure adopts standard SystemVerilog OOP verification practices
 
 ---
 
-### 2. 4-Bit Up/Down Counter (`up_down_counter/`)
+### 3. 4-Bit Up/Down Counter (`up_down_counter/`)
 
 A 4-bit synchronous binary counter capable of counting up or down based on a control input.
 
@@ -151,7 +200,7 @@ A 4-bit synchronous binary counter capable of counting up or down based on a con
 
 ---
 
-### 3. Blocking vs Non-Blocking Assignment Comparison (`blocking vs non_blocking/`)
+### 4. Blocking vs Non-Blocking Assignment Comparison (`blocking vs non_blocking/`)
 
 Demonstrates and compares the behavior of **Blocking (`=`)** and **Non-Blocking (`<=`)** procedural assignments in sequential logic blocks.
 
@@ -193,7 +242,11 @@ You can simulate these files using standard EDA tools or online simulators like 
 
 1. **Compile and Run:**
    ```bash
-   # For Full Layered Adder Testbench
+   # For Full Layered Full Adder Testbench
+   iverilog -g2012 -o fa_tb_sim FullAdder_SV/full_adder.sv.txt FullAdder_SV/testbench.sv.txt
+   vvp fa_tb_sim
+
+   # For Full Layered 4-bit Adder Testbench
    iverilog -g2012 -o adder_tb_sim ADDER_SV/adder.sv.txt ADDER_SV/testbench.sv.txt
    vvp adder_tb_sim
 
@@ -208,7 +261,7 @@ You can simulate these files using standard EDA tools or online simulators like 
 
 2. **View VCD Waveform:**
    ```bash
-   gtkwave ex.vcd
+   gtkwave dump.vcd
    ```
 
 ### Using ModelSim / QuestaSim / Vivado / VCS / EDA Playground

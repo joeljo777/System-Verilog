@@ -1,0 +1,8 @@
+interface intf (input logic clk, rst);
+  logic valid;
+  logic a;
+  logic b;
+  logic cin;
+  logic sum;
+  logic cout;
+endinterface
